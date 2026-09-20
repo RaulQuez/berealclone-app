@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import ParseSwift
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
@@ -13,10 +14,41 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
-        // Use this method to optionally configure and attach the UIWindow `window` to the provided UIWindowScene `scene`.
-        // If using a storyboard, the `window` property will automatically be initialized and attached to the scene.
-        // This delegate does not imply the connecting scene or session are new (see `application:configurationForConnectingSceneSession` instead).
-        guard let _ = (scene as? UIWindowScene) else { return }
+        guard let windowScene = (scene as? UIWindowScene) else { return }
+
+        let window = UIWindow(windowScene: windowScene)
+        self.window = window
+
+        // Parse-Swift restores the logged-in user (if any) from the keychain
+        // before this runs, so we can send people straight to the feed.
+        if User.current != nil {
+            showFeed(animated: false)
+        } else {
+            showLogin(animated: false)
+        }
+
+        window.makeKeyAndVisible()
+    }
+
+    // Called after a successful login/signup.
+    func showFeed(animated: Bool = true) {
+        let feedViewController = FeedViewController()
+        let navigationController = UINavigationController(rootViewController: feedViewController)
+        transition(to: navigationController, animated: animated)
+    }
+
+    // Called after logging out.
+    func showLogin(animated: Bool = true) {
+        let loginViewController = LoginViewController()
+        let navigationController = UINavigationController(rootViewController: loginViewController)
+        transition(to: navigationController, animated: animated)
+    }
+
+    private func transition(to rootViewController: UIViewController, animated: Bool) {
+        guard let window = window else { return }
+        window.rootViewController = rootViewController
+        guard animated else { return }
+        UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
@@ -49,4 +81,3 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
 
 }
-
