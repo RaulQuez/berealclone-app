@@ -23,6 +23,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // before this runs, so we can send people straight to the feed.
         if User.current != nil {
             showFeed(animated: false)
+            verifySession()
         } else {
             showLogin(animated: false)
         }
@@ -42,6 +43,19 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let loginViewController = LoginViewController()
         let navigationController = UINavigationController(rootViewController: loginViewController)
         transition(to: navigationController, animated: animated)
+    }
+
+    // The keychain can hold onto a session token the server no longer
+    // recognizes (revoked, expired, user deleted). Confirming it against the
+    // server on launch keeps a stale local session from silently sticking around.
+    private func verifySession() {
+        User.current?.fetch { [weak self] result in
+            if case .failure = result {
+                DispatchQueue.main.async {
+                    self?.showLogin()
+                }
+            }
+        }
     }
 
     private func transition(to rootViewController: UIViewController, animated: Bool) {
