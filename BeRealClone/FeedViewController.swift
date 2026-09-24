@@ -26,7 +26,7 @@ class FeedViewController: UITableViewController {
         navigationItem.title = "BeReal Clone"
         navigationItem.hidesBackButton = true
 
-        navigationItem.leftBarButtonItem = UIBarButtonItem(title: "Log Out", style: .plain, target: self, action: #selector(logoutTapped))
+        navigationItem.leftBarButtonItem = UIBarButtonItem(image: UIImage(systemName: "person.circle"), style: .plain, target: self, action: #selector(profileTapped))
         navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addTapped))
 
         tableView.register(PostCell.self, forCellReuseIdentifier: PostCell.reuseIdentifier)
@@ -71,19 +71,6 @@ class FeedViewController: UITableViewController {
         loadPosts(refresh: true)
     }
 
-    @objc private func logoutTapped() {
-        User.logout { [weak self] result in
-            DispatchQueue.main.async {
-                switch result {
-                case .success:
-                    self?.goToLogin()
-                case .failure(let error):
-                    self?.showAlert(message: error.message)
-                }
-            }
-        }
-    }
-
     @objc private func addTapped() {
         let newPostViewController = NewPostViewController()
         newPostViewController.delegate = self
@@ -92,9 +79,8 @@ class FeedViewController: UITableViewController {
         present(navigationController, animated: true)
     }
 
-    private func goToLogin() {
-        guard let sceneDelegate = view.window?.windowScene?.delegate as? SceneDelegate else { return }
-        sceneDelegate.showLogin()
+    @objc private func profileTapped() {
+        navigationController?.pushViewController(ProfileViewController(), animated: true)
     }
 
     private func showAlert(message: String) {

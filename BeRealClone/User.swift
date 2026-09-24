@@ -23,4 +23,8 @@ struct User: ParseUser {
     var emailVerified: Bool?
     var password: String?
     var authData: [String: [String: String]?]?
+
+    // Custom columns we added on top of the default _User class.
+    var profileImage: ParseFile?
+    var bio: String?
 }

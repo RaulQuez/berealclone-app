@@ -21,6 +21,15 @@ class PostCell: UITableViewCell {
         return imageView
     }()
 
+    private let avatarImageView: UIImageView = {
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        imageView.backgroundColor = .secondarySystemBackground
+        imageView.layer.cornerRadius = 14
+        return imageView
+    }()
+
     private let usernameLabel: UILabel = {
         let label = UILabel()
         label.font = .systemFont(ofSize: 16, weight: .semibold)
@@ -42,9 +51,10 @@ class PostCell: UITableViewCell {
         return label
     }()
 
-    // Keeps an in-flight image download from landing on a cell that has
-    // since been reused for a different post.
+    // Keeps in-flight image downloads from landing on a cell that has since
+    // been reused for a different post.
     private var imageDownloadTask: URLSessionDataTask?
+    private var avatarDownloadTask: URLSessionDataTask?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -57,12 +67,18 @@ class PostCell: UITableViewCell {
     }
 
     private func layoutSubviews_setup() {
-        let labelStack = UIStackView(arrangedSubviews: [usernameLabel, captionLabel, metaLabel])
+        let headerStack = UIStackView(arrangedSubviews: [avatarImageView, usernameLabel])
+        headerStack.axis = .horizontal
+        headerStack.spacing = 8
+        headerStack.alignment = .center
+
+        let labelStack = UIStackView(arrangedSubviews: [headerStack, captionLabel, metaLabel])
         labelStack.axis = .vertical
         labelStack.spacing = 4
         labelStack.translatesAutoresizingMaskIntoConstraints = false
 
         postImageView.translatesAutoresizingMaskIntoConstraints = false
+        avatarImageView.translatesAutoresizingMaskIntoConstraints = false
 
         contentView.addSubview(postImageView)
         contentView.addSubview(labelStack)
@@ -72,6 +88,9 @@ class PostCell: UITableViewCell {
             postImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             postImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             postImageView.heightAnchor.constraint(equalTo: postImageView.widthAnchor),
+
+            avatarImageView.widthAnchor.constraint(equalToConstant: 28),
+            avatarImageView.heightAnchor.constraint(equalToConstant: 28),
 
             labelStack.topAnchor.constraint(equalTo: postImageView.bottomAnchor, constant: 8),
             labelStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
@@ -83,7 +102,9 @@ class PostCell: UITableViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         imageDownloadTask?.cancel()
+        avatarDownloadTask?.cancel()
         postImageView.image = nil
+        avatarImageView.image = nil
         usernameLabel.text = nil
         captionLabel.text = nil
         metaLabel.text = nil
@@ -94,15 +115,27 @@ class PostCell: UITableViewCell {
         captionLabel.text = post.caption
         captionLabel.isHidden = (post.caption?.isEmpty ?? true)
         metaLabel.text = PostCell.metaText(for: post)
+        avatarImageView.image = UIImage(systemName: "person.circle.fill")
 
-        guard let url = post.imageFile?.url else { return }
-        imageDownloadTask = URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
-            guard let data = data, let image = UIImage(data: data) else { return }
-            DispatchQueue.main.async {
-                self?.postImageView.image = image
+        if let url = post.imageFile?.url {
+            imageDownloadTask = URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+                guard let data = data, let image = UIImage(data: data) else { return }
+                DispatchQueue.main.async {
+                    self?.postImageView.image = image
+                }
             }
+            imageDownloadTask?.resume()
         }
-        imageDownloadTask?.resume()
+
+        if let avatarURL = post.user?.profileImage?.url {
+            avatarDownloadTask = URLSession.shared.dataTask(with: avatarURL) { [weak self] data, _, _ in
+                guard let data = data, let image = UIImage(data: data) else { return }
+                DispatchQueue.main.async {
+                    self?.avatarImageView.image = image
+                }
+            }
+            avatarDownloadTask?.resume()
+        }
     }
 
     private static func metaText(for post: Post) -> String {

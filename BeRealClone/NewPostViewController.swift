@@ -19,6 +19,10 @@ class NewPostViewController: UIViewController {
     private var selectedAssetDate: Date?
     private var selectedAssetLocation: CLLocation?
 
+    // Only used for photos taken with the camera, since those don't have a
+    // PHAsset we can pull metadata from - we ask Core Location directly instead.
+    private let locationManager = CLLocationManager()
+
     private let imageView: UIImageView = {
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFill
@@ -56,6 +60,7 @@ class NewPostViewController: UIViewController {
 
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(choosePhotoTapped))
         imageView.addGestureRecognizer(tapGesture)
+        locationManager.delegate = self
 
         layoutSubviews()
     }
@@ -91,10 +96,33 @@ class NewPostViewController: UIViewController {
     }
 
     @objc private func choosePhotoTapped() {
+        let actionSheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+
+        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            actionSheet.addAction(UIAlertAction(title: "Take Photo", style: .default) { [weak self] _ in
+                self?.presentCamera()
+            })
+        }
+        actionSheet.addAction(UIAlertAction(title: "Choose from Library", style: .default) { [weak self] _ in
+            self?.presentPhotoLibrary()
+        })
+        actionSheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+
+        present(actionSheet, animated: true)
+    }
+
+    private func presentPhotoLibrary() {
         var config = PHPickerConfiguration(photoLibrary: .shared())
         config.filter = .images
         config.selectionLimit = 1
         let picker = PHPickerViewController(configuration: config)
+        picker.delegate = self
+        present(picker, animated: true)
+    }
+
+    private func presentCamera() {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
         picker.delegate = self
         present(picker, animated: true)
     }
@@ -185,5 +213,48 @@ extension NewPostViewController: PHPickerViewControllerDelegate {
         guard let asset = assets.firstObject else { return }
         selectedAssetDate = asset.creationDate
         selectedAssetLocation = asset.location
+    }
+}
+
+extension NewPostViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+        picker.dismiss(animated: true)
+
+        guard let image = info[.originalImage] as? UIImage else { return }
+        imageView.image = image
+        choosePhotoLabel.isHidden = true
+        selectedImage = image
+        navigationItem.rightBarButtonItem?.isEnabled = true
+
+        // A freshly-taken photo has no PHAsset, so we timestamp it ourselves
+        // and ask Core Location for wherever the device currently is.
+        selectedAssetDate = Date()
+        requestCurrentLocation()
+    }
+
+    private func requestCurrentLocation() {
+        switch locationManager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            locationManager.requestLocation()
+        case .notDetermined:
+            locationManager.requestWhenInUseAuthorization()
+        default:
+            break
+        }
+    }
+}
+
+extension NewPostViewController: CLLocationManagerDelegate {
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        guard manager.authorizationStatus == .authorizedWhenInUse || manager.authorizationStatus == .authorizedAlways else { return }
+        manager.requestLocation()
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        selectedAssetLocation = locations.last
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        // No location this time; the post still saves fine without one.
     }
 }
